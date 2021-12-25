@@ -5,30 +5,25 @@
 
 const resources = {
     shaders: {
-        type: 'json',
-        url: 'glsl/shaders.json'
+        type: "json",
+        url: "glsl/shaders.json",
     },
     mixins: {
-        type: 'json',
-        url: 'glsl/mixins.json'
+        type: "json",
+        url: "glsl/mixins.json",
     },
     templates: {
-        type: 'json',
-        url: 'html/templates.json'
+        type: "json",
+        url: "html/templates.json",
     },
     uispecs: {
-        type: 'json',
-        url: 'uispecs.json'
+        type: "json",
+        url: "uispecs.json",
     },
     all: {
-        type: 'dummy',
-        dependencies: [
-            'shaders',
-            'mixins',
-            'templates',
-            'uispecs'
-        ]
-    }
+        type: "dummy",
+        dependencies: ["shaders", "mixins", "templates", "uispecs"],
+    },
 };
 
 // TODO: fix this quick hack to load all resources into the old globals
@@ -39,13 +34,13 @@ let MIXINS;
 let TEMPLATES;
 let UISPECS;
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const rl = ResourceLoader.instance;
-    [ SHADERS, MIXINS, TEMPLATES, UISPECS ] = await Promise.all([
-        rl.loadResource('shaders'),
-        rl.loadResource('mixins'),
-        rl.loadResource('templates'),
-        rl.loadResource('uispecs'),
+    [SHADERS, MIXINS, TEMPLATES, UISPECS] = await Promise.all([
+        rl.loadResource("shaders"),
+        rl.loadResource("mixins"),
+        rl.loadResource("templates"),
+        rl.loadResource("uispecs"),
     ]);
     const application = new Application();
 });
