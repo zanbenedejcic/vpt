@@ -116,11 +116,12 @@ class Volume {
                         blockdim[2],
                         this.format,
                         this.type,
-                        this._typize_newSpecs(
-                            data,
-                            this.formats[topLevelBlock.format].type,
-                            this.formats[topLevelBlock.format].size
-                        )
+                        data
+                        // this._typize_newSpecs(
+                        //     data,
+                        //     this.formats[topLevelBlock.format].type,
+                        //     this.formats[topLevelBlock.format].size
+                        // )
                     );
                     this.ready = true;
                     handlers.onLoad && handlers.onLoad();
@@ -169,11 +170,12 @@ class Volume {
                         blockdim[2],
                         this.format,
                         this.type,
-                        this._typize_newSpecs(
-                            data,
-                            this.formats[block.format].type,
-                            this.formats[block.format].size
-                        )
+                        data
+                        // this._typize_newSpecs(
+                        //     data,
+                        //     this.formats[block.format].type,
+                        //     this.formats[block.format].size
+                        // )
                     );
                     remainingBlocks--;
                     if (remainingBlocks === 0) {
