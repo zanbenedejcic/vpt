@@ -1,9 +1,8 @@
 // #part /js/dialogs/AbstractDialog
 
 // #link ../ui
-// #link ../EventEmitter
 
-class AbstractDialog extends EventEmitter {
+class AbstractDialog extends EventTarget {
 
 constructor(spec, options) {
     super();
@@ -41,10 +40,6 @@ hide() {
 
 appendTo(object) {
     object.add(this._object);
-}
-
-detach() {
-    this._object.detach();
 }
 
 }

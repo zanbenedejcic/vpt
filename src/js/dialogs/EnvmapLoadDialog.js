@@ -29,19 +29,16 @@ _addEventListeners() {
     this._binds.demo.addEventListener('change', this._handleDemoChange);
 }
 
-_loadDemoJson() {
-    // TODO: rewrite with fetch
-    const xhr = new XMLHttpRequest();
-    xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-            this._demos = JSON.parse(xhr.responseText);
-            this._demos.forEach(demo => {
-                this._binds.demo.addOption(demo.value, demo.label);
-            });
-        }
-    });
-    xhr.open('GET', 'demo-envmaps.json');
-    xhr.send();
+async _loadDemoJson() {
+    try {
+        const response = await fetch('demo-envmaps.json');
+        this._demos = await response.json();
+        this._demos.forEach(demo => {
+            this._binds.demo.addOption(demo.value, demo.label);
+        });
+    } catch (e) {
+        console.warn('demo-envmaps.json not available');
+    }
 }
 
 _handleLoadClick() {
@@ -60,27 +57,33 @@ _handleLoadFile() {
     }
     const file = files[0];
 
-    this.trigger('load', {
-        type : 'file',
-        file : file
-    });
+    this.dispatchEvent(new CustomEvent('load', {
+        detail: {
+            type : 'file',
+            file : file,
+        }
+    }));
 }
 
 _handleLoadURL() {
     const url = this._binds.url.getValue();
-    this.trigger('load', {
-        type : 'url',
-        url  : url
-    });
+    this.dispatchEvent(new CustomEvent('load', {
+        detail: {
+            type : 'url',
+            url  : url,
+        }
+    }));
 }
 
 _handleLoadDemo() {
     const demo = this._binds.demo.getValue();
     const found = this._demos.find(d => d.value === demo);
-    this.trigger('load', {
-        type : 'url',
-        url  : found.url
-    });
+    this.dispatchEvent(new CustomEvent('load', {
+        detail: {
+            type : 'url',
+            url  : found.url,
+        }
+    }));
 }
 
 _handleTypeChange() {

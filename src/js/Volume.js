@@ -32,43 +32,46 @@ class Volume {
         }
     }
 
-    readMetadata(handlers) {
+    async readMetadata() {
         if (!this._reader) {
             return;
         }
+
         this.ready = false;
-        this._reader.readMetadata({
-            onData: (data) => {
-                this.asset = data.asset;
-                this.modalities = data.modalities;
-                this.blocks = data.blocks;
-                this.formats = data.formats;
-                handlers.onData && handlers.onData();
-            },
-        });
+        const data = await this._reader.readMetadata();
+        this.meta = data.meta; // TODO could be problematic, check later
+        this.modalities = data.modalities;
+        this.blocks = data.blocks;
+        // bvp stuff
+        this.asset = data.asset;
+        this.formats = data.formats;
     }
 
-    readModality(modalityName, handlers) {
-        if (!this._reader || !this.modalities) {
-            return;
+    async readModality(modalityName) {
+        if (!this._reader) {
+            throw new Error("No reader");
         }
+
+        if (!this.modalities) {
+            throw new Error("No modalities");
+        }
+
         this.ready = false;
         const modality = this.modalities.find(
             (modality) => modality.name === modalityName
         );
         if (!modality) {
-            return;
+            throw new Error("Modality does not exist");
+        }
+
+        const formats = this.formats; // TODO check if you need a const here?
+        if (!formats) {
+            throw new Error("Found no format");
         }
 
         const blocks = this.blocks;
         const topLevelBlock = blocks[modality.block];
         const topLevelBlockDimensions = blocks[modality.block].dimensions;
-
-        const formats = this.formats;
-        if (!formats) {
-            console.log("Found no format");
-            return;
-        }
 
         this._processFormat(
             formats[topLevelBlock.format].count,
@@ -98,35 +101,47 @@ class Volume {
             topLevelBlockDimensions[2]
         );
 
+        // for (const placement of modality.placements) {
+        //     const data = await this._reader.readBlock(placement.index);
+        //     const position = placement.position;
+        //     const block = blocks[placement.index];
+        //     const blockdim = block.dimensions;
+        //     gl.bindTexture(gl.TEXTURE_3D, this._texture);
+        //     gl.texSubImage3D(
+        //         gl.TEXTURE_3D,
+        //         0,
+        //         position.x,
+        //         position.y,
+        //         position.z,
+        //         blockdim.width,
+        //         blockdim.height,
+        //         blockdim.depth,
+        //         modality.format,
+        //         modality.type,
+        //         this._typize(data, modality.type)
+        //     );
+        // }
+
+        // draw BVP data
         // First we draw the top level block
         // If it has data we draw the data and end here as it has no further sub blocks
         if (topLevelBlock.data) {
-            this._reader.readBlock(modality.block, {
-                onData: (data) => {
-                    const blockdim = topLevelBlock.dimensions;
-                    gl.bindTexture(gl.TEXTURE_3D, this._texture);
-                    gl.texSubImage3D(
-                        gl.TEXTURE_3D,
-                        0,
-                        0, // position.x temporary ker je smo 1 block
-                        0, // position.y
-                        0, // position.z
-                        blockdim[0],
-                        blockdim[1],
-                        blockdim[2],
-                        this.format,
-                        this.type,
-                        data
-                        // this._typize_newSpecs(
-                        //     data,
-                        //     this.formats[topLevelBlock.format].type,
-                        //     this.formats[topLevelBlock.format].size
-                        // )
-                    );
-                    this.ready = true;
-                    handlers.onLoad && handlers.onLoad();
-                },
-            });
+            const data = await this._reader.readBlock(modality.block);
+            const blockdim = topLevelBlock.dimensions;
+            gl.bindTexture(gl.TEXTURE_3D, this._texture);
+            gl.texSubImage3D(
+                gl.TEXTURE_3D,
+                0,
+                0, // position.x temporary ker je smo 1 block
+                0, // position.y
+                0, // position.z
+                blockdim[0],
+                blockdim[1],
+                blockdim[2],
+                this.format,
+                this.type,
+                data
+            );
             return;
         }
 
@@ -150,40 +165,39 @@ class Volume {
             this.type,
             emptyData
         );
+
         // once we have drawn the top block with zeros, we start drawing sub blocks
         let remainingBlocks = topLevelBlock.blocks.length;
         topLevelBlock.blocks.forEach((currBlock) => {
-            this._reader.readBlock(currBlock.block, {
-                onData: (data) => {
-                    const block = blocks[currBlock.block]; // to je block k se ga izrisuje, dobiš v modalities.block, naprej pa v blocks.blocks
-                    const position = currBlock.position; // TODO pozicijo treba dobit iz blocks.blocks (če jih je vč, če je 1 block potm je position [0,0,0])
-                    const blockdim = block.dimensions; // moglo bi ostat isto
-                    gl.bindTexture(gl.TEXTURE_3D, this._texture);
-                    gl.texSubImage3D(
-                        gl.TEXTURE_3D,
-                        0,
-                        position[0], // x
-                        position[1], // y
-                        position[2], // z
-                        blockdim[0],
-                        blockdim[1],
-                        blockdim[2],
-                        this.format,
-                        this.type,
-                        data
-                        // this._typize_newSpecs(
-                        //     data,
-                        //     this.formats[block.format].type,
-                        //     this.formats[block.format].size
-                        // )
-                    );
-                    remainingBlocks--;
-                    if (remainingBlocks === 0) {
-                        this.ready = true;
-                        handlers.onLoad && handlers.onLoad();
-                    }
-                },
-            });
+            const data = await this._reader.readBlock(placement.index);
+            const block = blocks[currBlock.block]; // to je block k se ga izrisuje, dobiš v modalities.block, naprej pa v blocks.blocks
+            const position = currBlock.position; // TODO pozicijo treba dobit iz blocks.blocks (če jih je vč, če je 1 block potm je position [0,0,0])
+            const blockdim = block.dimensions; // moglo bi ostat isto
+            gl.bindTexture(gl.TEXTURE_3D, this._texture);
+            gl.texSubImage3D(
+                gl.TEXTURE_3D,
+                0,
+                position[0], // x
+                position[1], // y
+                position[2], // z
+                blockdim[0],
+                blockdim[1],
+                blockdim[2],
+                this.format,
+                this.type,
+                data
+                // TODO use this function instead of passing var data
+                // this._typize_newSpecs(
+                //     data,
+                //     this.formats[block.format].type,
+                //     this.formats[block.format].size
+                // )
+            );
+            remainingBlocks--;
+            if (remainingBlocks === 0) {
+                this.ready = true;
+                handlers.onLoad && handlers.onLoad();
+            }
         });
     }
 

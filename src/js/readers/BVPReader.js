@@ -82,30 +82,36 @@ class BVPReader extends AbstractReader {
         this._zipReader = new ZIPReader(this._loader);
     }
 
-    readMetadata(handlers) {
-        this._zipReader.readFile("manifest.json", {
-            onData: (data) => {
-                const decoder = new TextDecoder("utf-8");
-                const jsonString = decoder.decode(data);
-                const json = JSON.parse(jsonString);
-                this._metadata = json;
-                handlers.onData && handlers.onData(json);
-            },
-        });
+    async readMetadata() {
+        const data = await this._zipReader.readFile("manifest.json");
+        const decoder = new TextDecoder("utf-8");
+        const jsonString = decoder.decode(data);
+        const json = JSON.parse(jsonString);
+        this._metadata = json;
+        return this._metadata;
     }
 
-    readBlock(block, handlers) {
-        if (!this._metadata) {
-            return;
-        }
-        const blockMeta = this._metadata.blocks[block];
+    // readBlock(block, handlers) {
+    //     if (!this._metadata) {
+    //         return;
+    //     }
+    //     const blockMeta = this._metadata.blocks[block];
 
-        this._zipReader.readFile(blockMeta.data, {
-            onData: (data) => {
-                // decompress bvp data compressed with lz4mod
-                data = decompress(new Uint8Array(data));
-                handlers.onData && handlers.onData(data);
-            },
-        });
+    //     this._zipReader.readFile(blockMeta.data, {
+    //         onData: (data) => {
+    //             // decompress bvp data compressed with lz4mod
+    //             data = decompress(new Uint8Array(data));
+    //             handlers.onData && handlers.onData(data);
+    //         },
+    //     });
+    // }
+
+    async readBlock(block) {
+        if (!this._metadata) {
+            await this.readMetadata();
+        }
+        // TODO add decompression, idk if it needs to go here or in zipreader
+        const blockMeta = this._metadata.blocks[block];
+        return await this._zipReader.readFile(blockMeta.url);
     }
 }

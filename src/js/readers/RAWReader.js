@@ -17,9 +17,9 @@ class RAWReader extends AbstractReader {
         );
     }
 
-    readMetadata(handlers) {
+    async readMetadata() {
         let metadata = {
-            asset: {
+            meta: {
                 version: 1,
             },
             modalities: [
@@ -42,14 +42,6 @@ class RAWReader extends AbstractReader {
                 },
             ],
             blocks: [],
-            formats: [
-                {
-                    family: "mono",
-                    count: 1,
-                    type: "u",
-                    size: 1,
-                },
-            ],
         };
 
         for (let i = 0; i < this.depth; i++) {
@@ -69,17 +61,13 @@ class RAWReader extends AbstractReader {
             });
         }
 
-        handlers.onData && handlers.onData(metadata);
+        return metadata;
     }
 
-    readBlock(block, handlers) {
+    async readBlock(block) {
         const sliceBytes = this.width * this.height;
         const start = block * sliceBytes;
         const end = (block + 1) * sliceBytes;
-        this._loader.readData(start, end, {
-            onData: (data) => {
-                handlers.onData && handlers.onData(data);
-            },
-        });
+        return await this._loader.readData(start, end);
     }
 }
