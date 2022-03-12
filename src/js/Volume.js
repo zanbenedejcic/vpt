@@ -39,7 +39,6 @@ class Volume {
 
         this.ready = false;
         const data = await this._reader.readMetadata();
-        this.meta = data.meta; // TODO could be problematic, check later
         this.modalities = data.modalities;
         this.blocks = data.blocks;
         // bvp stuff
@@ -71,7 +70,7 @@ class Volume {
 
         const blocks = this.blocks;
         const topLevelBlock = blocks[modality.block];
-        const topLevelBlockDimensions = blocks[modality.block].dimensions;
+        const topLevelBlockDimensions = topLevelBlock.dimensions;
 
         this._processFormat(
             formats[topLevelBlock.format].count,
@@ -132,7 +131,7 @@ class Volume {
             gl.texSubImage3D(
                 gl.TEXTURE_3D,
                 0,
-                0, // position.x temporary ker je smo 1 block
+                0, // position.x we set this to 0 sine it's only 1 block
                 0, // position.y
                 0, // position.z
                 blockdim[0],
@@ -140,8 +139,13 @@ class Volume {
                 blockdim[2],
                 this.format,
                 this.type,
-                data
+                this._typize_newSpecs(
+                    data,
+                    this.formats[topLevelBlock.format].type,
+                    this.formats[topLevelBlock.format].size
+                )
             );
+            this.ready = true;
             return;
         }
 
@@ -168,8 +172,8 @@ class Volume {
 
         // once we have drawn the top block with zeros, we start drawing sub blocks
         let remainingBlocks = topLevelBlock.blocks.length;
-        topLevelBlock.blocks.forEach((currBlock) => {
-            const data = await this._reader.readBlock(placement.index);
+        topLevelBlock.blocks.forEach(async (currBlock) => {
+            const data = await this._reader.readBlock(modality.block);
             const block = blocks[currBlock.block]; // to je block k se ga izrisuje, dobiš v modalities.block, naprej pa v blocks.blocks
             const position = currBlock.position; // TODO pozicijo treba dobit iz blocks.blocks (če jih je vč, če je 1 block potm je position [0,0,0])
             const blockdim = block.dimensions; // moglo bi ostat isto
@@ -185,13 +189,11 @@ class Volume {
                 blockdim[2],
                 this.format,
                 this.type,
-                data
-                // TODO use this function instead of passing var data
-                // this._typize_newSpecs(
-                //     data,
-                //     this.formats[block.format].type,
-                //     this.formats[block.format].size
-                // )
+                this._typize_newSpecs(
+                    data,
+                    this.formats[block.format].type,
+                    this.formats[block.format].size
+                )
             );
             remainingBlocks--;
             if (remainingBlocks === 0) {

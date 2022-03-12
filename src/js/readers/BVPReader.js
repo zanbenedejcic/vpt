@@ -107,11 +107,15 @@ class BVPReader extends AbstractReader {
     // }
 
     async readBlock(block) {
+        // fill with 0
+        // load subblocks
+        // load data (rec), check if encoding (raw, lz4mod)
+        // return
         if (!this._metadata) {
             await this.readMetadata();
         }
-        // TODO add decompression, idk if it needs to go here or in zipreader
+        // TODO add decompression, specifikacija
         const blockMeta = this._metadata.blocks[block];
-        return await this._zipReader.readFile(blockMeta.url);
+        return await this._zipReader.readFile(blockMeta.data);
     }
 }
