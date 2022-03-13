@@ -63,8 +63,7 @@ class Volume {
             throw new Error("Modality does not exist");
         }
 
-        const formats = this.formats; // TODO check if you need a const here?
-        if (!formats) {
+        if (!this.formats) {
             throw new Error("Found no format");
         }
 
@@ -73,9 +72,9 @@ class Volume {
         const topLevelBlockDimensions = topLevelBlock.dimensions;
 
         this._processFormat(
-            formats[topLevelBlock.format].count,
-            formats[topLevelBlock.format].type,
-            formats[topLevelBlock.format].size
+            this.formats[topLevelBlock.format].count,
+            this.formats[topLevelBlock.format].type,
+            this.formats[topLevelBlock.format].size
         );
 
         const gl = this._gl;
@@ -131,12 +130,12 @@ class Volume {
             gl.texSubImage3D(
                 gl.TEXTURE_3D,
                 0,
-                0, // position.x we set this to 0 sine it's only 1 block
+                0, // position.x we set this to 0 since it's only 1 block
                 0, // position.y
                 0, // position.z
-                blockdim[0],
-                blockdim[1],
-                blockdim[2],
+                blockdim[0], // width
+                blockdim[1], // depth
+                blockdim[2], // height
                 this.format,
                 this.type,
                 this._typize_newSpecs(
@@ -149,34 +148,13 @@ class Volume {
             return;
         }
 
-        // If it has no data we first draw top level block with all 0 and then we go over it's sub blocks
-        const sizeOfEmptyData =
-            topLevelBlockDimensions[0] *
-            topLevelBlockDimensions[1] *
-            topLevelBlockDimensions[2];
-        const emptyData = new Uint8Array(sizeOfEmptyData);
-        gl.bindTexture(gl.TEXTURE_3D, this._texture);
-        gl.texSubImage3D(
-            gl.TEXTURE_3D,
-            0,
-            0, // position.x
-            0, // position.y
-            0, // position.z
-            topLevelBlockDimensions[0],
-            topLevelBlockDimensions[1],
-            topLevelBlockDimensions[2],
-            this.format,
-            this.type,
-            emptyData
-        );
-
-        // once we have drawn the top block with zeros, we start drawing sub blocks
+        // loop over all placements of top level block
         let remainingBlocks = topLevelBlock.blocks.length;
         topLevelBlock.blocks.forEach(async (currBlock) => {
-            const data = await this._reader.readBlock(modality.block);
-            const block = blocks[currBlock.block]; // to je block k se ga izrisuje, dobiš v modalities.block, naprej pa v blocks.blocks
-            const position = currBlock.position; // TODO pozicijo treba dobit iz blocks.blocks (če jih je vč, če je 1 block potm je position [0,0,0])
-            const blockdim = block.dimensions; // moglo bi ostat isto
+            const data = await this._reader.readBlock(currBlock.block); // current placement
+            const block = blocks[currBlock.block];
+            const position = currBlock.position;
+            const blockdim = block.dimensions;
             gl.bindTexture(gl.TEXTURE_3D, this._texture);
             gl.texSubImage3D(
                 gl.TEXTURE_3D,
@@ -184,9 +162,9 @@ class Volume {
                 position[0], // x
                 position[1], // y
                 position[2], // z
-                blockdim[0],
-                blockdim[1],
-                blockdim[2],
+                blockdim[0], // width
+                blockdim[1], // depth
+                blockdim[2], // height
                 this.format,
                 this.type,
                 this._typize_newSpecs(
@@ -198,7 +176,6 @@ class Volume {
             remainingBlocks--;
             if (remainingBlocks === 0) {
                 this.ready = true;
-                handlers.onLoad && handlers.onLoad();
             }
         });
     }
@@ -286,6 +263,7 @@ class Volume {
         if (type === "f" && size == 4) {
             return new Float32Array(data);
         }
+        throw new Error("Data structure not supported.");
     }
 
     getTexture() {

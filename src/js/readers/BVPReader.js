@@ -91,31 +91,33 @@ class BVPReader extends AbstractReader {
         return this._metadata;
     }
 
-    // readBlock(block, handlers) {
-    //     if (!this._metadata) {
-    //         return;
-    //     }
-    //     const blockMeta = this._metadata.blocks[block];
-
-    //     this._zipReader.readFile(blockMeta.data, {
-    //         onData: (data) => {
-    //             // decompress bvp data compressed with lz4mod
-    //             data = decompress(new Uint8Array(data));
-    //             handlers.onData && handlers.onData(data);
-    //         },
-    //     });
-    // }
-
-    async readBlock(block) {
-        // fill with 0
-        // load subblocks
-        // load data (rec), check if encoding (raw, lz4mod)
-        // return
+    async readBlock(blockIndex) {
         if (!this._metadata) {
             await this.readMetadata();
         }
-        // TODO add decompression, specifikacija
-        const blockMeta = this._metadata.blocks[block];
-        return await this._zipReader.readFile(blockMeta.data);
+        const blockMeta = this._metadata.blocks[blockIndex];
+
+        if (blockMeta.data) {
+            var data = await this._zipReader.readFile(blockMeta.data);
+            if (blockMeta.encoding === "lz4mod")
+                data = decompress(new Uint8Array(data)); // TODO it's not always Uint8array
+            return data;
+        } else {
+            // make block and fill with 0
+            const sizeOfEmptyData =
+                blockMeta.dimensions[0] *
+                blockMeta.dimensions[1] *
+                blockMeta.dimensions[2];
+            var blockFrame = new ArrayBuffer(sizeOfEmptyData);
+
+            // recursively go over subblocks if there are any
+            blockMeta.blocks.forEach((currBlock) => {
+                var tempData = this.readBlock(currBlock.block);
+                // TODO add tempData to the proper position in blockFrame (currBlock.position)
+                blockFrame = tempData;
+                return tempData;
+            });
+            return blockFrame;
+        }
     }
 }
