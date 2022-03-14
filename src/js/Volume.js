@@ -152,6 +152,7 @@ class Volume {
         let remainingBlocks = topLevelBlock.blocks.length;
         topLevelBlock.blocks.forEach(async (currBlock) => {
             const data = await this._reader.readBlock(currBlock.block); // current placement
+            console.log("volumeData:", data);
             const block = blocks[currBlock.block];
             const position = currBlock.position;
             const blockdim = block.dimensions;
@@ -173,11 +174,13 @@ class Volume {
                     this.formats[block.format].size
                 )
             );
-            remainingBlocks--;
+            remainingBlocks--; // TODO check if this is even needed
             if (remainingBlocks === 0) {
+                console.log("ready");
                 this.ready = true;
             }
         });
+        // this.ready = true;
     }
 
     _processFormat(count, type, size) {

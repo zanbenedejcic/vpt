@@ -111,13 +111,59 @@ class BVPReader extends AbstractReader {
             var blockFrame = new ArrayBuffer(sizeOfEmptyData);
 
             // recursively go over subblocks if there are any
-            blockMeta.blocks.forEach((currBlock) => {
-                var tempData = this.readBlock(currBlock.block);
+            blockMeta.blocks.forEach(async (currBlock) => {
+                var tempData = await this.readBlock(currBlock.block);
+                console.log("tempData", tempData);
                 // TODO add tempData to the proper position in blockFrame (currBlock.position)
+
                 blockFrame = tempData;
-                return tempData;
+
+                // tempData.then((value) => {
+                // tempData is a promise, data is extracted with .then func
+                // var arrayDataView = new DataView(tempData);
+                // var frameDataView = new DataView(blockFrame);
+                // blockFrame = this.copyData(
+                //     arrayDataView,
+                //     frameDataView,
+                //     currBlock.position,
+                //     blockMeta.dimensions
+                // );
+                // blockFrame = blockFrame.buffer;
+                // console.log("blockFrameInThen", blockFrame);
+                // });
             });
+            console.log("blockFrame:", blockFrame);
             return blockFrame;
         }
+    }
+
+    copyData(src, dest, blockPosition, blockDimensions) {
+        const startIndex =
+            blockPosition[0] +
+            blockDimensions[0] * blockPosition[1] +
+            blockDimensions[0] * blockDimensions[1] * blockPosition[2]; // x + dimX * y + dimX * dimY * z
+        for (let index = 0; index < src.byteLength; index++) {
+            const offset = index + startIndex;
+            dest.setUint8(offset, src.getUint8(offset)); // TODO check if this is a problem (Uint8)
+        }
+        return dest;
+    }
+
+    sumOfArray(arr) {
+        var sum = 0;
+        for (let index = 0; index < arr.byteLength; index++) {
+            sum += arr.getUint8(index);
+        }
+        console.log("sum:", sum);
+    }
+
+    isCopy(arr1, arr2) {
+        for (let i = 0; i < arr1.byteLength; i++) {
+            if (arr1.getUint8(i) != arr2.getUint8(i)) {
+                console.log("Not the same!", i);
+                return;
+            }
+        }
+        console.log("Same");
     }
 }
