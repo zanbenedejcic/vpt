@@ -99,27 +99,6 @@ class Volume {
             topLevelBlockDimensions[2]
         );
 
-        // for (const placement of modality.placements) {
-        //     const data = await this._reader.readBlock(placement.index);
-        //     const position = placement.position;
-        //     const block = blocks[placement.index];
-        //     const blockdim = block.dimensions;
-        //     gl.bindTexture(gl.TEXTURE_3D, this._texture);
-        //     gl.texSubImage3D(
-        //         gl.TEXTURE_3D,
-        //         0,
-        //         position.x,
-        //         position.y,
-        //         position.z,
-        //         blockdim.width,
-        //         blockdim.height,
-        //         blockdim.depth,
-        //         modality.format,
-        //         modality.type,
-        //         this._typize(data, modality.type)
-        //     );
-        // }
-
         // draw BVP data
         // First we draw the top level block
         // If it has data we draw the data and end here as it has no further sub blocks
@@ -149,10 +128,8 @@ class Volume {
         }
 
         // loop over all placements of top level block
-        let remainingBlocks = topLevelBlock.blocks.length;
-        topLevelBlock.blocks.forEach(async (currBlock) => {
+        for (const currBlock of topLevelBlock.blocks) {
             const data = await this._reader.readBlock(currBlock.block); // current placement
-            console.log("volumeData:", data);
             const block = blocks[currBlock.block];
             const position = currBlock.position;
             const blockdim = block.dimensions;
@@ -174,13 +151,8 @@ class Volume {
                     this.formats[block.format].size
                 )
             );
-            remainingBlocks--; // TODO check if this is even needed
-            if (remainingBlocks === 0) {
-                console.log("ready");
-                this.ready = true;
-            }
-        });
-        // this.ready = true;
+        }
+        this.ready = true;
     }
 
     _processFormat(count, type, size) {

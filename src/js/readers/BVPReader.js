@@ -98,7 +98,7 @@ class BVPReader extends AbstractReader {
         const blockMeta = this._metadata.blocks[blockIndex];
 
         if (blockMeta.data) {
-            var data = await this._zipReader.readFile(blockMeta.data);
+            let data = await this._zipReader.readFile(blockMeta.data);
             if (blockMeta.encoding === "lz4mod")
                 data = decompress(new Uint8Array(data)); // TODO it's not always Uint8array
             return data;
@@ -108,31 +108,21 @@ class BVPReader extends AbstractReader {
                 blockMeta.dimensions[0] *
                 blockMeta.dimensions[1] *
                 blockMeta.dimensions[2];
-            var blockFrame = new ArrayBuffer(sizeOfEmptyData);
+            const blockFrame = new ArrayBuffer(sizeOfEmptyData);
 
             // recursively go over subblocks if there are any
-            blockMeta.blocks.forEach(async (currBlock) => {
-                var tempData = await this.readBlock(currBlock.block);
-                console.log("tempData", tempData);
-                // TODO add tempData to the proper position in blockFrame (currBlock.position)
+            for (const currBlock of blockMeta.blocks) {
+                const tempData = await this.readBlock(currBlock.block);
+                const arrayDataView = new DataView(tempData);
+                const frameDataView = new DataView(blockFrame);
+                this.copyData(
+                    arrayDataView,
+                    frameDataView,
+                    currBlock.position,
+                    blockMeta.dimensions
+                );
+            }
 
-                blockFrame = tempData;
-
-                // tempData.then((value) => {
-                // tempData is a promise, data is extracted with .then func
-                // var arrayDataView = new DataView(tempData);
-                // var frameDataView = new DataView(blockFrame);
-                // blockFrame = this.copyData(
-                //     arrayDataView,
-                //     frameDataView,
-                //     currBlock.position,
-                //     blockMeta.dimensions
-                // );
-                // blockFrame = blockFrame.buffer;
-                // console.log("blockFrameInThen", blockFrame);
-                // });
-            });
-            console.log("blockFrame:", blockFrame);
             return blockFrame;
         }
     }
