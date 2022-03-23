@@ -80,6 +80,8 @@ class BVPReader extends AbstractReader {
 
         this._metadata = null;
         this._zipReader = new ZIPReader(this._loader);
+
+        this.visitedBlocks = [];
     }
 
     async readMetadata() {
@@ -92,6 +94,13 @@ class BVPReader extends AbstractReader {
     }
 
     async readBlock(blockIndex) {
+        // check for loops in placements
+        if (this.visitedBlocks.includes(blockIndex)) {
+            return -1;
+        } else {
+            this.visitedBlocks.push(blockIndex);
+        }
+
         if (!this._metadata) {
             await this.readMetadata();
         }
@@ -113,6 +122,7 @@ class BVPReader extends AbstractReader {
             // recursively go over subblocks if there are any
             for (const currBlock of blockMeta.blocks) {
                 const tempData = await this.readBlock(currBlock.block);
+                if (tempData == -1) continue; // TODO maybe there's a better way of doing this
                 const arrayDataView = new DataView(tempData);
                 const frameDataView = new DataView(blockFrame);
                 this.copyData(
@@ -122,7 +132,6 @@ class BVPReader extends AbstractReader {
                     blockMeta.dimensions
                 );
             }
-
             return blockFrame;
         }
     }
