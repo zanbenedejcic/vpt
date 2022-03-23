@@ -143,7 +143,7 @@ class BVPReader extends AbstractReader {
             blockDimensions[0] * blockDimensions[1] * blockPosition[2]; // x + dimX * y + dimX * dimY * z
         for (let index = 0; index < src.byteLength; index++) {
             const offset = index + startIndex;
-            dest.setUint8(offset, src.getUint8(offset)); // TODO check if this is a problem (Uint8)
+            dest.setUint8(offset, src.getUint8(index)); // TODO check if this is a problem (Uint8)
         }
         return dest;
     }
