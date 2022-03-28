@@ -3,6 +3,205 @@
 // #link AbstractReader
 // #link ZIPReader
 
+class vec {
+    static const(length, x) {
+        return new Array(length).fill(x);
+    }
+    static zeros(length) {
+        return vec.const(length, 0);
+    }
+    static ones(length) {
+        return vec.const(length, 1);
+    }
+
+    static clone(a) {
+        return [...a];
+    }
+    static length(a) {
+        return Math.hypot(...a);
+    }
+
+    static unaryOp(a, op) {
+        return a.map(op);
+    }
+
+    static binaryOp(a, b, op) {
+        if (a.length !== b.length) {
+            throw new DimensionMismatchError();
+        }
+        const out = vec.zeros(a.length);
+        for (let i = 0; i < a.length; i++) {
+            out[i] = op(a[i], b[i]);
+        }
+        return out;
+    }
+
+    static all(a) {
+        return a.every((a) => a);
+    }
+    static any(a) {
+        return a.some((a) => a);
+    }
+    static none(a) {
+        return a.every((a) => !a);
+    }
+
+    static floor(a) {
+        return vec.unaryOp(a, Math.floor);
+    }
+    static ceil(a) {
+        return vec.unaryOp(a, Math.ceil);
+    }
+    static round(a) {
+        return vec.unaryOp(a, Math.round);
+    }
+    static add(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a + b);
+    }
+    static sub(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a - b);
+    }
+    static mul(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a * b);
+    }
+    static div(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a / b);
+    }
+    static mod(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a % b);
+    }
+    static min(a, b) {
+        return vec.binaryOp(a, b, Math.min);
+    }
+    static max(a, b) {
+        return vec.binaryOp(a, b, Math.max);
+    }
+
+    static eq(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a === b);
+    }
+    static neq(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a !== b);
+    }
+    static approx(a, b, eps) {
+        return vec.binaryOp(a, b, (a, b) => Math.abs(a - b < eps));
+    }
+    static lt(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a < b);
+    }
+    static gt(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a > b);
+    }
+    static leq(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a <= b);
+    }
+    static geq(a, b) {
+        return vec.binaryOp(a, b, (a, b) => a >= b);
+    }
+
+    static mulElements(a) {
+        return a.reduce((x, y) => x * y);
+    }
+
+    static sumElements(a) {
+        return a.reduce((x, y) => x + y);
+    }
+
+    static dot(a, b) {
+        return vec.sumElements(vec.mul(a, b));
+    }
+
+    static linearIndex(index, dimensions) {
+        const dims = vec.clone(dimensions);
+        let scale = 1;
+        for (let i = 0; i < dims.length; i++) {
+            dims[i] = scale;
+            scale *= dimensions[i];
+        }
+        return vec.sumElements(vec.mul(index, dims));
+    }
+
+    static *lexi(a) {
+        const b = new Array(a.length).fill(0);
+        const count = a.reduce((a, b) => a * b);
+        for (let j = 0; j < count; j++) {
+            yield [...b];
+            for (let i = 0; i < b.length; i++) {
+                b[i]++;
+                if (b[i] >= a[i]) {
+                    b[i] = 0;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+class Block {
+    constructor(dimensions, format, data) {
+        this.dimensions = dimensions;
+        this.format = format;
+        this.data = data;
+    }
+
+    set(offset, block, sourceData, format) {
+        const start = offset;
+        const end = vec.add(offset, block.dimensions);
+        const extent = vec.sub(end, start);
+        const srcData = sourceData;
+
+        if (this.format !== format) {
+            throw new Error("Format missmatch");
+        }
+        if (vec.any(vec.gt(start, end))) {
+            throw new Error("Start greater than end");
+        }
+        if (vec.any(vec.lt(start, vec.zeros(start.length)))) {
+            throw new Error("Start out of bounds");
+        }
+        if (vec.any(vec.gt(end, this.dimensions))) {
+            throw new Error("End out of bounds");
+        }
+        if (vec.any(vec.mod(start, this.format.microblockDimensions))) {
+            throw new Error("Not on microblock boundary");
+        }
+        if (vec.any(vec.mod(extent, this.format.microblockDimensions))) {
+            throw new Error("Not an integer number of microblocks");
+        }
+
+        const { microblockSize, microblockDimensions } = this.format;
+        const microblockStart = vec.div(start, microblockDimensions);
+        const microblockEnd = vec.div(end, microblockDimensions);
+        const microblockCropExtent = vec.div(extent, microblockDimensions);
+        const microblockFullExtent = vec.div(
+            this.dimensions,
+            microblockDimensions
+        );
+
+        const srcBytes = new Uint8Array(srcData);
+        const dstBytes = new Uint8Array(this.data);
+        for (const localMicroblockIndex of vec.lexi(microblockCropExtent)) {
+            const globalMicroblockIndex = vec.add(
+                localMicroblockIndex,
+                microblockStart
+            );
+            const srcMicroblockIndex = vec.linearIndex(
+                localMicroblockIndex,
+                microblockCropExtent
+            );
+            const dstMicroblockIndex = vec.linearIndex(
+                globalMicroblockIndex,
+                microblockFullExtent
+            );
+            for (let i = 0; i < microblockSize; i++) {
+                dstBytes[i + dstMicroblockIndex * microblockSize] =
+                    srcBytes[i + srcMicroblockIndex * microblockSize];
+            }
+        }
+        return this;
+    }
+}
+
 function decompressSize(src) {
     let [srcIndex, dstIndex] = [0, 0];
 
@@ -94,17 +293,18 @@ class BVPReader extends AbstractReader {
     }
 
     async readBlock(blockIndex) {
-        // check for loops in placements
+        const blockMeta = this._metadata.blocks[blockIndex];
+        // check for recursive loops in placements
         if (this.visitedBlocks.includes(blockIndex)) {
             return -1;
-        } else {
+        } else if (!blockMeta.data) {
+            // if block has no data, add to visited blocks
             this.visitedBlocks.push(blockIndex);
         }
 
         if (!this._metadata) {
             await this.readMetadata();
         }
-        const blockMeta = this._metadata.blocks[blockIndex];
 
         if (blockMeta.data) {
             let data = await this._zipReader.readFile(blockMeta.data);
@@ -117,52 +317,26 @@ class BVPReader extends AbstractReader {
                 blockMeta.dimensions[0] *
                 blockMeta.dimensions[1] *
                 blockMeta.dimensions[2];
-            const blockFrame = new ArrayBuffer(sizeOfEmptyData);
+            const blockFramedata = new ArrayBuffer(sizeOfEmptyData);
+            const blockFrame = new Block(
+                blockMeta.dimensions,
+                this._metadata.formats[blockMeta.format],
+                blockFramedata
+            );
 
-            // recursively go over subblocks if there are any
-            for (const currBlock of blockMeta.blocks) {
-                const tempData = await this.readBlock(currBlock.block);
-                if (tempData == -1) continue; // TODO maybe there's a better way of doing this
-                const arrayDataView = new DataView(tempData);
-                const frameDataView = new DataView(blockFrame);
-                this.copyData(
-                    arrayDataView,
-                    frameDataView,
-                    currBlock.position,
-                    blockMeta.dimensions
+            // recursively go over placements if there are any
+            for (const currPlacement of blockMeta.placements) {
+                const readData = await this.readBlock(currPlacement.block);
+                if (readData == -1) continue; // TODO maybe there's a better way of doing this
+                // copy read data to a block at the correct positions and offsets
+                blockFrame.set(
+                    currPlacement.position,
+                    this._metadata.blocks[currPlacement.block],
+                    readData,
+                    this._metadata.formats[blockMeta.format]
                 );
             }
-            return blockFrame;
+            return blockFrame.data; // return only the ArrayBuffer from the frameBlock
         }
-    }
-
-    copyData(src, dest, blockPosition, blockDimensions) {
-        const startIndex =
-            blockPosition[0] +
-            blockDimensions[0] * blockPosition[1] +
-            blockDimensions[0] * blockDimensions[1] * blockPosition[2]; // x + dimX * y + dimX * dimY * z
-        for (let index = 0; index < src.byteLength; index++) {
-            const offset = index + startIndex;
-            dest.setUint8(offset, src.getUint8(index)); // TODO check if this is a problem (Uint8)
-        }
-        return dest;
-    }
-
-    sumOfArray(arr) {
-        var sum = 0;
-        for (let index = 0; index < arr.byteLength; index++) {
-            sum += arr.getUint8(index);
-        }
-        console.log("sum:", sum);
-    }
-
-    isCopy(arr1, arr2) {
-        for (let i = 0; i < arr1.byteLength; i++) {
-            if (arr1.getUint8(i) != arr2.getUint8(i)) {
-                console.log("Not the same!", i);
-                return;
-            }
-        }
-        console.log("Same");
     }
 }

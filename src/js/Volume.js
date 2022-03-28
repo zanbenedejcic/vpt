@@ -128,7 +128,7 @@ class Volume {
         }
 
         // loop over all placements of top level block
-        for (const currBlock of topLevelBlock.blocks) {
+        for (const currBlock of topLevelBlock.placements) {
             const data = await this._reader.readBlock(currBlock.block); // current placement
             const block = blocks[currBlock.block];
             const position = currBlock.position;
