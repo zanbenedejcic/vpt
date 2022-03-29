@@ -67,6 +67,10 @@ class Volume {
             throw new Error("Found no format");
         }
 
+        // check if there are cycles
+        const graph = CommonUtils.makeGraph(this.blocks);
+        const sorted = CommonUtils.toposort(graph);
+
         const blocks = this.blocks;
         const topLevelBlock = blocks[modality.block];
         const topLevelBlockDimensions = topLevelBlock.dimensions;
