@@ -144,13 +144,13 @@ class Block {
         this.data = data;
     }
 
-    set(offset, block, sourceData, format) {
+    set(offset, block) {
         const start = offset;
         const end = vec.add(offset, block.dimensions);
         const extent = vec.sub(end, start);
-        const srcData = sourceData;
+        const srcData = block.data;
 
-        if (this.format !== format) {
+        if (this.format !== block.format) {
             throw new Error("Format missmatch");
         }
         if (vec.any(vec.gt(start, end))) {
@@ -279,8 +279,6 @@ class BVPReader extends AbstractReader {
 
         this._metadata = null;
         this._zipReader = new ZIPReader(this._loader);
-
-        this.visitedBlocks = [];
     }
 
     async readMetadata() {
@@ -294,25 +292,23 @@ class BVPReader extends AbstractReader {
 
     async readBlock(blockIndex) {
         const blockMeta = this._metadata.blocks[blockIndex];
-        // check for recursive loops in placements
-        if (this.visitedBlocks.includes(blockIndex)) {
-            return -1;
-        } else if (!blockMeta.data) {
-            // if block has no data, add to visited blocks
-            this.visitedBlocks.push(blockIndex);
-        }
 
         if (!this._metadata) {
             await this.readMetadata();
         }
 
         if (blockMeta.data) {
-            let data = await this._zipReader.readFile(blockMeta.data);
+            let data = await this._zipReader.readFile(blockMeta.data); // read data
             if (blockMeta.encoding === "lz4mod")
-                data = decompress(new Uint8Array(data)); // TODO it's not always Uint8array
-            return data;
+                data = decompress(new Uint8Array(data));
+            const newBlock = new Block(
+                blockMeta.dimensions,
+                this._metadata.formats[blockMeta.format],
+                data
+            );
+            return newBlock;
         } else {
-            // make block and fill with 0
+            // make block frame and fill with 0
             const sizeOfEmptyData =
                 blockMeta.dimensions[0] *
                 blockMeta.dimensions[1] *
@@ -326,17 +322,11 @@ class BVPReader extends AbstractReader {
 
             // recursively go over placements if there are any
             for (const currPlacement of blockMeta.placements) {
-                const readData = await this.readBlock(currPlacement.block);
-                if (readData == -1) continue; // TODO maybe there's a better way of doing this
+                const newBlock = await this.readBlock(currPlacement.block);
                 // copy read data to a block at the correct positions and offsets
-                blockFrame.set(
-                    currPlacement.position,
-                    this._metadata.blocks[currPlacement.block],
-                    readData,
-                    this._metadata.formats[blockMeta.format]
-                );
+                blockFrame.set(currPlacement.position, newBlock);
             }
-            return blockFrame.data; // return only the ArrayBuffer from the frameBlock
+            return blockFrame; // returns whole block
         }
     }
 }

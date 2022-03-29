@@ -103,8 +103,7 @@ class Volume {
         // First we draw the top level block
         // If it has data we draw the data and end here as it has no further sub blocks
         if (topLevelBlock.data) {
-            const data = await this._reader.readBlock(modality.block);
-            const blockdim = topLevelBlock.dimensions;
+            const readBlock = await this._reader.readBlock(modality.block);
             gl.bindTexture(gl.TEXTURE_3D, this._texture);
             gl.texSubImage3D(
                 gl.TEXTURE_3D,
@@ -112,15 +111,15 @@ class Volume {
                 0, // position.x we set this to 0 since it's only 1 block
                 0, // position.y
                 0, // position.z
-                blockdim[0], // width
-                blockdim[1], // depth
-                blockdim[2], // height
+                readBlock.dimensions[0], // width
+                readBlock.dimensions[1], // depth
+                readBlock.dimensions[2], // height
                 this.format,
                 this.type,
                 this._typize_newSpecs(
-                    data,
-                    this.formats[topLevelBlock.format].type,
-                    this.formats[topLevelBlock.format].size
+                    readBlock.data,
+                    readBlock.format.type,
+                    readBlock.format.size
                 )
             );
             this.ready = true;
@@ -129,10 +128,8 @@ class Volume {
 
         // loop over all placements of top level block
         for (const currBlock of topLevelBlock.placements) {
-            const data = await this._reader.readBlock(currBlock.block); // current placement
-            const block = blocks[currBlock.block];
+            const readBlock = await this._reader.readBlock(currBlock.block); // current placement
             const position = currBlock.position;
-            const blockdim = block.dimensions;
             gl.bindTexture(gl.TEXTURE_3D, this._texture);
             gl.texSubImage3D(
                 gl.TEXTURE_3D,
@@ -140,15 +137,15 @@ class Volume {
                 position[0], // x
                 position[1], // y
                 position[2], // z
-                blockdim[0], // width
-                blockdim[1], // depth
-                blockdim[2], // height
+                readBlock.dimensions[0], // width
+                readBlock.dimensions[1], // depth
+                readBlock.dimensions[2], // height
                 this.format,
                 this.type,
                 this._typize_newSpecs(
-                    data,
-                    this.formats[block.format].type,
-                    this.formats[block.format].size
+                    readBlock.data,
+                    readBlock.format.type,
+                    readBlock.format.size
                 )
             );
         }
