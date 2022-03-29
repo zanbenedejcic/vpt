@@ -279,6 +279,8 @@ class BVPReader extends AbstractReader {
 
         this._metadata = null;
         this._zipReader = new ZIPReader(this._loader);
+
+        this.cachedBlocks = new Map(); // [key, value] = [index, block]
     }
 
     async readMetadata() {
@@ -322,9 +324,19 @@ class BVPReader extends AbstractReader {
 
             // recursively go over placements if there are any
             for (const currPlacement of blockMeta.placements) {
-                const newBlock = await this.readBlock(currPlacement.block);
-                // copy read data to a block at the correct positions and offsets
-                blockFrame.set(currPlacement.position, newBlock);
+                // block already read
+                if (this.cachedBlocks.has(currPlacement.block)) {
+                    console.log(currPlacement.block);
+                    blockFrame.set(
+                        currPlacement.position,
+                        this.cachedBlocks.get(currPlacement.block)
+                    );
+                } else {
+                    const newBlock = await this.readBlock(currPlacement.block);
+                    // copy read data to a block at the correct positions and offsets
+                    blockFrame.set(currPlacement.position, newBlock);
+                    this.cachedBlocks.set(currPlacement.block, newBlock);
+                }
             }
             return blockFrame; // returns whole block
         }
