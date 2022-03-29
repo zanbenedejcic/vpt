@@ -65,7 +65,6 @@ class CommonUtils {
         let processing = {};
 
         Object.keys(graph).forEach(function visit(next) {
-            console.log(next);
             if (visited[next]) return;
             if (processing[next]) throw new Error("Cyclic dependencies");
 
