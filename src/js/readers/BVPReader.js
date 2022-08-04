@@ -271,7 +271,7 @@ function decompress(src, size) {
 }
 
 function decompressS3DC(src, MMV, dimensions) {
-  const ibits = 2;
+  const ibits = 4;
   var bitmask = 3;
   if (ibits == 4) bitmask = 15;
   // get min and max
