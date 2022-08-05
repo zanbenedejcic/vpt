@@ -270,10 +270,17 @@ function decompress(src, size) {
   return dstIndex === dst.length ? dst : dst.slice(0, dstIndex);
 }
 
+function calculateIbits(srcLength, dimensions) {
+  const ratio = (dimensions[0] * dimensions[1] * dimensions[2]) / srcLength;
+  if (ratio == 2) return 4;
+  else if (ratio == 4) return 2;
+  else throw new Error("Error when calculating iBits");
+}
+
 function decompressS3DC(src, MMV, dimensions) {
-  const ibits = 4;
-  var bitmask = 3;
-  if (ibits == 4) bitmask = 15;
+  const ibits = calculateIbits(src.length, dimensions);
+  var bitmask = 3; // 00000011
+  if (ibits == 4) bitmask = 15; // 00001111
   // get min and max
   const min = MMV[0];
   const max = MMV[1];
