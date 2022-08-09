@@ -1,20 +1,64 @@
-// #part /js/renderers/EAMRenderer
+import { WebGL } from '../WebGL.js';
+import { AbstractRenderer } from './AbstractRenderer.js';
 
-// #link ../WebGL
-// #link AbstractRenderer
+const [ SHADERS, MIXINS ] = await Promise.all([
+    'shaders.json',
+    'mixins.json',
+].map(url => fetch(url).then(response => response.json())));
 
-class EAMRenderer extends AbstractRenderer {
+export class EAMRenderer extends AbstractRenderer {
 
 constructor(gl, volume, environmentTexture, options) {
     super(gl, volume, environmentTexture, options);
 
-    Object.assign(this, {
-        extinction : 100,
-        slices     : 64,
-        steps      : 64,
-    }, options);
+    this.registerProperties([
+        {
+            name: 'extinction',
+            label: 'Extinction',
+            type: 'spinner',
+            value: 100,
+            min: 0,
+        },
+        {
+            name: 'slices',
+            label: 'Slices',
+            type: 'spinner',
+            value: 64,
+            min: 1,
+        },
+        {
+            name: 'random',
+            label: 'Random',
+            type: 'checkbox',
+            value: true,
+        },
+        {
+            name: 'transferFunction',
+            label: 'Transfer function',
+            type: 'transfer-function',
+            value: new Uint8Array(256),
+        },
+    ]);
+
+    this.addEventListener('change', e => {
+        const { name, value } = e.detail;
+
+        if (name === 'transferFunction') {
+            this.setTransferFunction(this.transferFunction);
+        }
+
+        if ([
+            'extinction',
+            'slices',
+            'random',
+            'transferFunction',
+        ].includes(name)) {
+            this.reset();
+        }
+    });
 
     this._programs = WebGL.buildPrograms(this._gl, SHADERS.renderers.EAM, MIXINS);
+    this._frameNumber = 0;
 }
 
 destroy() {
@@ -33,6 +77,8 @@ _resetFrame() {
     gl.useProgram(program);
 
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+    this._frameNumber = 0;
 }
 
 _generateFrame() {
@@ -50,11 +96,13 @@ _generateFrame() {
     gl.uniform1i(uniforms.uTransferFunction, 1);
     gl.uniform1f(uniforms.uStepSize, 1 / this.slices);
     gl.uniform1f(uniforms.uExtinction, this.extinction);
-    gl.uniform1f(uniforms.uOffset, Math.random());
+    gl.uniform1f(uniforms.uOffset, this.random ? Math.random() : 0);
     const mvpit = this.calculateMVPInverseTranspose();
     gl.uniformMatrix4fv(uniforms.uMvpInverseMatrix, false, mvpit.m);
 
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+    this._frameNumber++;
 }
 
 _integrateFrame() {
@@ -70,6 +118,7 @@ _integrateFrame() {
 
     gl.uniform1i(uniforms.uAccumulator, 0);
     gl.uniform1i(uniforms.uFrame, 1);
+    gl.uniform1f(uniforms.uMix, 1 / this._frameNumber);
 
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
@@ -97,7 +146,7 @@ _getFrameBufferSpec() {
         mag            : gl.NEAREST,
         format         : gl.RGBA,
         internalFormat : gl.RGBA,
-        type           : gl.UNSIGNED_BYTE
+        type           : gl.UNSIGNED_BYTE,
     }];
 }
 
@@ -110,7 +159,7 @@ _getAccumulationBufferSpec() {
         mag            : gl.NEAREST,
         format         : gl.RGBA,
         internalFormat : gl.RGBA,
-        type           : gl.UNSIGNED_BYTE
+        type           : gl.UNSIGNED_BYTE,
     }];
 }
 

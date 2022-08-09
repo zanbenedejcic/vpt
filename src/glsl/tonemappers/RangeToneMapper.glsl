@@ -1,4 +1,4 @@
-// #part /glsl/shaders/RangeToneMapper/vertex
+// #part /glsl/shaders/tonemappers/RangeToneMapper/vertex
 
 #version 300 es
 
@@ -10,7 +10,7 @@ void main() {
     vPosition = aPosition * 0.5 + 0.5;
 }
 
-// #part /glsl/shaders/RangeToneMapper/fragment
+// #part /glsl/shaders/tonemappers/RangeToneMapper/fragment
 
 #version 300 es
 precision mediump float;
@@ -18,11 +18,12 @@ precision mediump float;
 uniform mediump sampler2D uTexture;
 uniform float uMin;
 uniform float uMax;
+uniform float uGamma;
 
 in vec2 vPosition;
 out vec4 oColor;
 
 void main() {
     vec4 src = texture(uTexture, vPosition);
-    oColor = (src - uMin) / (uMax - uMin);
+    oColor = pow((src - uMin) / (uMax - uMin), vec4(1.0 / uGamma));
 }

@@ -1,4 +1,4 @@
-// #part /glsl/shaders/ArtisticToneMapper/vertex
+// #part /glsl/shaders/tonemappers/ArtisticToneMapper/vertex
 
 #version 300 es
 
@@ -10,7 +10,7 @@ void main() {
     vPosition = aPosition * 0.5 + 0.5;
 }
 
-// #part /glsl/shaders/ArtisticToneMapper/fragment
+// #part /glsl/shaders/tonemappers/ArtisticToneMapper/fragment
 
 #version 300 es
 precision mediump float;
@@ -22,6 +22,7 @@ uniform float uLow;
 uniform float uMid;
 uniform float uHigh;
 uniform float uSaturation;
+uniform float uGamma;
 
 in vec2 vPosition;
 out vec4 oColor;
@@ -32,7 +33,7 @@ void main() {
     const vec3 gray = normalize(vec3(1));
     color = vec4(mix(dot(color.rgb, gray) * gray, color.rgb, uSaturation), 1.0);
     float midpoint = (uMid - uLow) / (uHigh - uLow);
-    float exponent = -log(2.0) / log(midpoint);
-    color = pow(color, vec4(exponent));
+    float exponent = -log(midpoint) / log(2.0);
+    color = pow(color, vec4(exponent / uGamma));
     oColor = vec4(color.rgb, 1.0);
 }

@@ -1,7 +1,5 @@
-// #part /js/readers/BVPReader
-
-// #link AbstractReader
-// #link ZIPReader
+import { AbstractReader } from "./AbstractReader.js";
+import { ZIPReader } from "./ZIPReader.js";
 
 class vec {
   static const(length, x) {
@@ -302,7 +300,7 @@ function decompressS3DC(src, MMV, dimensions) {
   return dst;
 }
 
-class BVPReader extends AbstractReader {
+export class BVPReader extends AbstractReader {
   constructor(loader) {
     super(loader);
 

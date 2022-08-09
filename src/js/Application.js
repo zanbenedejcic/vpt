@@ -1,233 +1,227 @@
-// #part /js/Application
+import { DOMUtils } from "./utils/DOMUtils.js";
 
-// #link utils
-// #link readers
-// #link loaders
-// #link dialogs
-// #link ui
-// #link RenderingContext
+import "./ui/UI.js";
 
-class Application {
-    constructor() {
-        this._handleFileDrop = this._handleFileDrop.bind(this);
-        this._handleRendererChange = this._handleRendererChange.bind(this);
-        this._handleToneMapperChange = this._handleToneMapperChange.bind(this);
-        this._handleVolumeLoad = this._handleVolumeLoad.bind(this);
-        this._handleEnvmapLoad = this._handleEnvmapLoad.bind(this);
+import { LoaderFactory } from "./loaders/LoaderFactory.js";
+import { ReaderFactory } from "./readers/ReaderFactory.js";
 
-        this._renderingContext = new RenderingContext();
-        this._canvas = this._renderingContext.getCanvas();
-        this._canvas.className += "renderer";
-        document.body.appendChild(this._canvas);
+import { MainDialog } from "./dialogs/MainDialog/MainDialog.js";
+import { VolumeLoadDialog } from "./dialogs/VolumeLoadDialog/VolumeLoadDialog.js";
+import { EnvmapLoadDialog } from "./dialogs/EnvmapLoadDialog/EnvmapLoadDialog.js";
+import { RenderingContextDialog } from "./dialogs/RenderingContextDialog/RenderingContextDialog.js";
+import { DialogConstructor } from "./dialogs/DialogConstructor.js";
 
-        window.addEventListener("resize", () => {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            this._renderingContext.resize(width, height);
+import { RenderingContext } from "./RenderingContext.js";
+
+export class Application {
+  constructor() {
+    this._handleFileDrop = this._handleFileDrop.bind(this);
+    this._handleRendererChange = this._handleRendererChange.bind(this);
+    this._handleToneMapperChange = this._handleToneMapperChange.bind(this);
+    this._handleVolumeLoad = this._handleVolumeLoad.bind(this);
+    this._handleEnvmapLoad = this._handleEnvmapLoad.bind(this);
+    this._handleRecordAnimation = this._handleRecordAnimation.bind(this);
+
+    this.binds = DOMUtils.bind(document.body);
+
+    this.renderingContext = new RenderingContext();
+    this.binds.container.appendChild(this.renderingContext.getCanvas());
+
+    document.body.addEventListener("dragover", (e) => e.preventDefault());
+    document.body.addEventListener("drop", this._handleFileDrop);
+
+    this.mainDialog = new MainDialog();
+
+    this.volumeLoadDialog = new VolumeLoadDialog();
+    this.mainDialog
+      .getVolumeLoadContainer()
+      .appendChild(this.volumeLoadDialog.object);
+    this.volumeLoadDialog.addEventListener("load", this._handleVolumeLoad);
+
+    this.envmapLoadDialog = new EnvmapLoadDialog();
+    this.mainDialog
+      .getEnvmapLoadContainer()
+      .appendChild(this.envmapLoadDialog.object);
+    this.envmapLoadDialog.addEventListener("load", this._handleEnvmapLoad);
+
+    this.renderingContextDialog = new RenderingContextDialog();
+    this.mainDialog
+      .getRenderingContextSettingsContainer()
+      .appendChild(this.renderingContextDialog.object);
+    this.renderingContextDialog.addEventListener("resolution", (e) => {
+      const resolution = this.renderingContextDialog.resolution;
+      this.renderingContext.setResolution(resolution);
+    });
+    this.renderingContextDialog.addEventListener("transformation", (e) => {
+      const s = this.renderingContextDialog.scale;
+      const t = this.renderingContextDialog.translation;
+      this.renderingContext.setScale(...s);
+      this.renderingContext.setTranslation(...t);
+    });
+    this.renderingContextDialog.addEventListener("filter", (e) => {
+      const filter = this.renderingContextDialog.filter;
+      this.renderingContext.setFilter(filter);
+    });
+    this.renderingContextDialog.addEventListener("fullscreen", (e) => {
+      this.renderingContext
+        .getCanvas()
+        .classList.toggle("fullscreen", this.renderingContextDialog.fullscreen);
+    });
+
+    new ResizeObserver((entries) => {
+      const size = entries[0].contentBoxSize[0];
+      this.renderingContext._camera.resize(size.inlineSize, size.blockSize);
+    }).observe(this.renderingContext.getCanvas());
+
+    this.renderingContext.addEventListener("progress", (e) => {
+      this.volumeLoadDialog.binds.loadProgress.value = e.detail;
+    });
+
+    this.renderingContext.addEventListener("animationprogress", (e) => {
+      this.mainDialog.binds.animationProgress.value = e.detail;
+    });
+
+    this.mainDialog.addEventListener(
+      "rendererchange",
+      this._handleRendererChange
+    );
+    this.mainDialog.addEventListener(
+      "tonemapperchange",
+      this._handleToneMapperChange
+    );
+    this._handleRendererChange();
+    this._handleToneMapperChange();
+
+    this.mainDialog.addEventListener(
+      "recordanimation",
+      this._handleRecordAnimation
+    );
+  }
+
+  async _handleRecordAnimation(e) {
+    this.renderingContext.recordAnimation(e.detail);
+  }
+
+  _handleFileDrop(e) {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length === 0) {
+      return;
+    }
+    const file = files[0];
+    if (!file.name.toLowerCase().endsWith(".bvp")) {
+      throw new Error("Filename extension must be .bvp");
+    }
+    this._handleVolumeLoad(
+      new CustomEvent("load", {
+        detail: {
+          type: "file",
+          file: file,
+          filetype: "bvp",
+          dimensions: { x: 0, y: 0, z: 0 }, // doesn't matter
+          precision: 8, // doesn't matter
+        },
+      })
+    );
+  }
+
+  _handleRendererChange() {
+    if (this.rendererDialog) {
+      this.rendererDialog.remove();
+    }
+
+    const which = this.mainDialog.getSelectedRenderer();
+    this.renderingContext.chooseRenderer(which);
+    const renderer = this.renderingContext.getRenderer();
+    const object = DialogConstructor.construct(renderer.properties);
+    const binds = DOMUtils.bind(object);
+    this.rendererDialog = object;
+    for (const name in binds) {
+      binds[name].addEventListener("change", (e) => {
+        const value = binds[name].value;
+        renderer[name] = value;
+        renderer.dispatchEvent(
+          new CustomEvent("change", {
+            detail: { name, value },
+          })
+        );
+      });
+    }
+    const container = this.mainDialog.getRendererSettingsContainer();
+    container.appendChild(this.rendererDialog);
+  }
+
+  _handleToneMapperChange() {
+    if (this.toneMapperDialog) {
+      this.toneMapperDialog.remove();
+    }
+
+    const which = this.mainDialog.getSelectedToneMapper();
+    this.renderingContext.chooseToneMapper(which);
+    const toneMapper = this.renderingContext.getToneMapper();
+    const object = DialogConstructor.construct(toneMapper.properties);
+    const binds = DOMUtils.bind(object);
+    this.toneMapperDialog = object;
+    for (const name in binds) {
+      binds[name].addEventListener("change", (e) => {
+        const value = binds[name].value;
+        toneMapper[name] = value;
+        toneMapper.dispatchEvent(
+          new CustomEvent("change", {
+            detail: { name, value },
+          })
+        );
+      });
+    }
+    const container = this.mainDialog.getToneMapperSettingsContainer();
+    container.appendChild(this.toneMapperDialog);
+  }
+
+  _handleVolumeLoad(e) {
+    const options = e.detail;
+    if (options.type === "file") {
+      const readerClass = ReaderFactory(options.filetype);
+      if (readerClass) {
+        const loaderClass = LoaderFactory("blob");
+        const loader = new loaderClass(options.file);
+        const reader = new readerClass(loader, {
+          width: options.dimensions[0],
+          height: options.dimensions[1],
+          depth: options.dimensions[2],
+          bits: options.precision,
         });
-        window.dispatchEvent(new Event("resize"));
-
-        document.body.addEventListener("dragover", (e) => e.preventDefault());
-        document.body.addEventListener("drop", this._handleFileDrop);
-
-        this._mainDialog = new MainDialog();
-        if (!this._renderingContext.hasComputeCapabilities()) {
-            this._mainDialog.disableMCC();
-        }
-
-        this._statusBar = new StatusBar();
-        this._statusBar.appendTo(document.body);
-
-        this._volumeLoadDialog = new VolumeLoadDialog();
-        this._volumeLoadDialog.appendTo(
-            this._mainDialog.getVolumeLoadContainer()
-        );
-        this._volumeLoadDialog.addEventListener("load", this._handleVolumeLoad);
-
-        this._envmapLoadDialog = new EnvmapLoadDialog();
-        this._envmapLoadDialog.appendTo(
-            this._mainDialog.getEnvmapLoadContainer()
-        );
-        this._envmapLoadDialog.addEventListener("load", this._handleEnvmapLoad);
-
-        this._renderingContextDialog = new RenderingContextDialog();
-        this._renderingContextDialog.appendTo(
-            this._mainDialog.getRenderingContextSettingsContainer()
-        );
-        this._renderingContextDialog.addEventListener("resolution", (e) => {
-            const resolution = this._renderingContextDialog.resolution;
-            this._renderingContext.setResolution(resolution);
-        });
-        this._renderingContextDialog.addEventListener("transformation", (e) => {
-            const s = this._renderingContextDialog.scale;
-            const t = this._renderingContextDialog.translation;
-            this._renderingContext.setScale(s.x, s.y, s.z);
-            this._renderingContext.setTranslation(t.x, t.y, t.z);
-        });
-        this._renderingContextDialog.addEventListener("filter", (e) => {
-            const filter = this._renderingContextDialog.filter;
-            this._renderingContext.setFilter(filter);
-        });
-
-        this._mainDialog.addEventListener(
-            "rendererchange",
-            this._handleRendererChange
-        );
-        this._mainDialog.addEventListener(
-            "tonemapperchange",
-            this._handleToneMapperChange
-        );
-        this._handleRendererChange();
-        this._handleToneMapperChange();
+        this.renderingContext.stopRendering();
+        this.renderingContext.setVolume(reader);
+      }
+    } else if (options.type === "url") {
+      const readerClass = ReaderFactory(options.filetype);
+      if (readerClass) {
+        const loaderClass = LoaderFactory("ajax");
+        const loader = new loaderClass(options.url);
+        const reader = new readerClass(loader);
+        this.renderingContext.stopRendering();
+        this.renderingContext.setVolume(reader);
+      }
     }
+  }
 
-    _handleFileDrop(e) {
-        e.preventDefault();
-        const files = e.dataTransfer.files;
-        if (files.length === 0) {
-            return;
-        }
-        const file = files[0];
-        if (!file.name.toLowerCase().endsWith(".bvp")) {
-            throw new Error("Filename extension must be .bvp");
-        }
-        this._handleVolumeLoad(
-            new CustomEvent("load", {
-                detail: {
-                    type: "file",
-                    file: file,
-                    filetype: "bvp",
-                    dimensions: { x: 0, y: 0, z: 0 }, // doesn't matter
-                    precision: 8, // doesn't matter
-                },
-            })
-        );
+  _handleEnvmapLoad(e) {
+    const options = e.detail;
+    let image = new Image();
+    image.crossOrigin = "anonymous";
+    image.addEventListener("load", () => {
+      this.renderingContext.setEnvironmentMap(image);
+      this.renderingContext.getRenderer().reset();
+    });
+
+    if (options.type === "file") {
+      let reader = new FileReader();
+      reader.addEventListener("load", () => {
+        image.src = reader.result;
+      });
+      reader.readAsDataURL(options.file);
+    } else if (options.type === "url") {
+      image.src = options.url;
     }
-
-    _handleRendererChange() {
-        if (this._rendererDialog) {
-            this._rendererDialog.destroy();
-        }
-        const which = this._mainDialog.getSelectedRenderer();
-        this._renderingContext.chooseRenderer(which);
-        const renderer = this._renderingContext.getRenderer();
-        const container = this._mainDialog.getRendererSettingsContainer();
-        const dialogClass = this._getDialogForRenderer(which);
-        this._rendererDialog = new dialogClass(renderer);
-        this._rendererDialog.appendTo(container);
-    }
-
-    _handleToneMapperChange() {
-        if (this._toneMapperDialog) {
-            this._toneMapperDialog.destroy();
-        }
-        const which = this._mainDialog.getSelectedToneMapper();
-        this._renderingContext.chooseToneMapper(which);
-        const toneMapper = this._renderingContext.getToneMapper();
-        const container = this._mainDialog.getToneMapperSettingsContainer();
-        const dialogClass = this._getDialogForToneMapper(which);
-        this._toneMapperDialog = new dialogClass(toneMapper);
-        this._toneMapperDialog.appendTo(container);
-    }
-
-    _handleVolumeLoad(e) {
-        const options = e.detail;
-        if (options.type === "file") {
-            const readerClass = this._getReaderForFileType(options.filetype);
-            if (readerClass) {
-                const loader = new BlobLoader(options.file);
-                const reader = new readerClass(loader, {
-                    width: options.dimensions.x,
-                    height: options.dimensions.y,
-                    depth: options.dimensions.z,
-                    bits: options.precision,
-                });
-                this._renderingContext.stopRendering();
-                this._renderingContext.setVolume(reader);
-            }
-        } else if (options.type === "url") {
-            const readerClass = this._getReaderForFileType(options.filetype);
-            if (readerClass) {
-                const loader = new AjaxLoader(options.url);
-                const reader = new readerClass(loader);
-                this._renderingContext.stopRendering();
-                this._renderingContext.setVolume(reader);
-            }
-        }
-    }
-
-    _handleEnvmapLoad(e) {
-        const options = e.detail;
-        let image = new Image();
-        image.crossOrigin = "anonymous";
-        image.addEventListener("load", () => {
-            this._renderingContext.setEnvironmentMap(image);
-            this._renderingContext.getRenderer().reset();
-        });
-
-        if (options.type === "file") {
-            let reader = new FileReader();
-            reader.addEventListener("load", () => {
-                image.src = reader.result;
-            });
-            reader.readAsDataURL(options.file);
-        } else if (options.type === "url") {
-            image.src = options.url;
-        }
-    }
-
-    _getReaderForFileType(type) {
-        switch (type) {
-            case "bvp":
-                return BVPReader;
-            case "raw":
-                return RAWReader;
-            case "zip":
-                return ZIPReader;
-        }
-    }
-
-    _getDialogForRenderer(renderer) {
-        switch (renderer) {
-            case "mip":
-                return MIPRendererDialog;
-            case "iso":
-                return ISORendererDialog;
-            case "eam":
-                return EAMRendererDialog;
-            case "mcs":
-                return MCSRendererDialog;
-            case "mcm":
-                return MCMRendererDialog;
-            case "mcc":
-                return MCMRendererDialog; // yes, the same
-            case "dos":
-                return DOSRendererDialog;
-        }
-    }
-
-    _getDialogForToneMapper(toneMapper) {
-        switch (toneMapper) {
-            case "artistic":
-                return ArtisticToneMapperDialog;
-            case "range":
-                return RangeToneMapperDialog;
-            case "reinhard":
-                return ReinhardToneMapperDialog;
-            case "reinhard2":
-                return Reinhard2ToneMapperDialog;
-            case "uncharted2":
-                return Uncharted2ToneMapperDialog;
-            case "filmic":
-                return FilmicToneMapperDialog;
-            case "unreal":
-                return UnrealToneMapperDialog;
-            case "aces":
-                return AcesToneMapperDialog;
-            case "lottes":
-                return LottesToneMapperDialog;
-            case "uchimura":
-                return UchimuraToneMapperDialog;
-        }
-    }
+  }
 }

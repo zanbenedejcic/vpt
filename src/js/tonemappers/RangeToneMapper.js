@@ -1,20 +1,40 @@
-// #part /js/tonemappers/RangeToneMapper
+import { WebGL } from '../WebGL.js';
+import { AbstractToneMapper } from './AbstractToneMapper.js';
 
-// #link ../WebGL
-// #link AbstractToneMapper
+const [ SHADERS, MIXINS ] = await Promise.all([
+    'shaders.json',
+    'mixins.json',
+].map(url => fetch(url).then(response => response.json())));
 
-class RangeToneMapper extends AbstractToneMapper {
+export class RangeToneMapper extends AbstractToneMapper {
 
 constructor(gl, texture, options) {
     super(gl, texture, options);
 
-    Object.assign(this, {
-        _min : 0,
-        _max : 1
-    }, options);
+    this.registerProperties([
+        {
+            name: 'min',
+            label: 'Min',
+            type: 'spinner',
+            value: 0,
+        },
+        {
+            name: 'max',
+            label: 'Max',
+            type: 'spinner',
+            value: 1,
+        },
+        {
+            name: 'gamma',
+            label: 'Gamma',
+            type: 'spinner',
+            value: 2.2,
+            min: 0,
+        },
+    ]);
 
-    this._program = WebGL.buildPrograms(this._gl, {
-        RangeToneMapper : SHADERS.RangeToneMapper
+    this._program = WebGL.buildPrograms(gl, {
+        RangeToneMapper: SHADERS.tonemappers.RangeToneMapper
     }, MIXINS).RangeToneMapper;
 }
 
@@ -35,8 +55,9 @@ _renderFrame() {
     gl.bindTexture(gl.TEXTURE_2D, this._texture);
 
     gl.uniform1i(uniforms.uTexture, 0);
-    gl.uniform1f(uniforms.uMin, this._min);
-    gl.uniform1f(uniforms.uMax, this._max);
+    gl.uniform1f(uniforms.uMin, this.min);
+    gl.uniform1f(uniforms.uMax, this.max);
+    gl.uniform1f(uniforms.uGamma, this.gamma);
 
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }

@@ -1,4 +1,4 @@
-// #part /glsl/shaders/FilmicToneMapper/vertex
+// #part /glsl/shaders/tonemappers/FilmicToneMapper/vertex
 
 #version 300 es
 
@@ -10,13 +10,14 @@ void main() {
     vPosition = aPosition * 0.5 + 0.5;
 }
 
-// #part /glsl/shaders/FilmicToneMapper/fragment
+// #part /glsl/shaders/tonemappers/FilmicToneMapper/fragment
 
 #version 300 es
 precision mediump float;
 
 uniform mediump sampler2D uTexture;
 uniform float uExposure;
+uniform float uGamma;
 
 in vec2 vPosition;
 out vec4 oColor;
@@ -35,5 +36,5 @@ float filmic(float x) {
 
 void main() {
     vec4 src = texture(uTexture, vPosition);
-    oColor = vec4(filmic(src.rgb * uExposure), 1);
+    oColor = pow(vec4(filmic(src.rgb * uExposure), 1), vec4(1.0 / uGamma));
 }

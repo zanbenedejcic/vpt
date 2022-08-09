@@ -1,17 +1,35 @@
-// #part /js/tonemappers/Uncharted2ToneMapper
+import { WebGL } from '../WebGL.js';
+import { AbstractToneMapper } from './AbstractToneMapper.js';
 
-// #link ../WebGL
-// #link AbstractToneMapper
+const [ SHADERS, MIXINS ] = await Promise.all([
+    'shaders.json',
+    'mixins.json',
+].map(url => fetch(url).then(response => response.json())));
 
-class Uncharted2ToneMapper extends AbstractToneMapper {
+export class Uncharted2ToneMapper extends AbstractToneMapper {
 
 constructor(gl, texture, options) {
     super(gl, texture, options);
 
-    this.exposure = 1;
+    this.registerProperties([
+        {
+            name: 'exposure',
+            label: 'Exposure',
+            type: 'spinner',
+            value: 1,
+            min: 0,
+        },
+        {
+            name: 'gamma',
+            label: 'Gamma',
+            type: 'spinner',
+            value: 2.2,
+            min: 0,
+        },
+    ]);
 
-    this._program = WebGL.buildPrograms(this._gl, {
-        Uncharted2ToneMapper : SHADERS.Uncharted2ToneMapper
+    this._program = WebGL.buildPrograms(gl, {
+        Uncharted2ToneMapper: SHADERS.tonemappers.Uncharted2ToneMapper
     }, MIXINS).Uncharted2ToneMapper;
 }
 
@@ -33,6 +51,7 @@ _renderFrame() {
 
     gl.uniform1i(uniforms.uTexture, 0);
     gl.uniform1f(uniforms.uExposure, this.exposure);
+    gl.uniform1f(uniforms.uGamma, this.gamma);
 
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
