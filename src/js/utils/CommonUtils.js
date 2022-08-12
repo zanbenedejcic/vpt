@@ -87,4 +87,107 @@ export class CommonUtils {
     }
     return graph;
   }
+
+  static decompressSize(src) {
+    let [srcIndex, dstIndex] = [0, 0];
+
+    while (srcIndex < src.length) {
+      const token = src[srcIndex++];
+      if (token === 0) break;
+
+      // literal copy
+      let literalCount = token >>> 4;
+      if (literalCount === 0x0f) {
+        do {
+          literalCount += src[srcIndex];
+        } while (src[srcIndex++] === 0xff);
+      }
+      srcIndex += literalCount;
+      dstIndex += literalCount;
+
+      // match copy
+      srcIndex += 2;
+      let matchLength = token & 0x0f;
+      if (matchLength === 0x0f) {
+        do {
+          matchLength += src[srcIndex];
+        } while (src[srcIndex++] === 0xff);
+      }
+      dstIndex += matchLength;
+    }
+
+    return dstIndex;
+  }
+
+  static decompress(src, size) {
+    if (!size) {
+      size = CommonUtils.decompressSize(src);
+    }
+    const dst = new Uint8Array(size);
+    let [srcIndex, dstIndex] = [0, 0];
+
+    while (srcIndex < src.length) {
+      const token = src[srcIndex++];
+      if (token === 0) break;
+
+      // literal copy
+      let literalCount = token >>> 4;
+      if (literalCount === 0x0f) {
+        do {
+          literalCount += src[srcIndex];
+        } while (src[srcIndex++] === 0xff);
+      }
+      for (let i = 0; i < literalCount; i++) {
+        dst[dstIndex++] = src[srcIndex++];
+      }
+
+      // match copy
+      const offset = (src[srcIndex + 0] << 0) | (src[srcIndex + 1] << 8);
+      srcIndex += 2;
+      let matchIndex = dstIndex - offset;
+      let matchLength = token & 0x0f;
+      if (matchLength === 0x0f) {
+        do {
+          matchLength += src[srcIndex];
+        } while (src[srcIndex++] === 0xff);
+      }
+      for (let i = 0; i < matchLength; i++) {
+        dst[dstIndex++] = dst[matchIndex++];
+      }
+    }
+
+    return dstIndex === dst.length ? dst : dst.slice(0, dstIndex);
+  }
+
+  static calculateIbits(srcLength, dimensions) {
+    const ratio = (dimensions[0] * dimensions[1] * dimensions[2]) / srcLength;
+    if (ratio == 2) return 4;
+    else if (ratio == 4) return 2;
+    else throw new Error("Error when calculating iBits");
+  }
+
+  static decompressS3DC(src, MMV, dimensions) {
+    const ibits = CommonUtils.calculateIbits(src.length, dimensions);
+    var bitmask = 3; // 00000011
+    if (ibits == 4) bitmask = 15; // 00001111
+    // get min and max
+    const min = MMV[0];
+    const max = MMV[1];
+    // make buffer dim^3
+    const dst = new Uint8Array(dimensions[0] * dimensions[1] * dimensions[2]);
+    // loop over src
+    var position = 8 / ibits;
+    for (const val of src) {
+      var offset = 1;
+      for (let i = 0; i < 8; i += ibits) {
+        const index = (val & (bitmask << i)) >>> i; // extract index from bits in byte
+        const dv = min + (max - min) * (index / (Math.pow(2, ibits) - 1)); // calculate decompressed value
+        dst[position - offset] = dv;
+        offset++;
+      }
+      position += 8 / ibits;
+      offset = 0;
+    }
+    return dst;
+  }
 }

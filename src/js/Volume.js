@@ -117,8 +117,8 @@ export class Volume extends EventTarget {
         0, // position.y
         0, // position.z
         readBlock.dimensions[0], // width
-        readBlock.dimensions[1], // depth
-        readBlock.dimensions[2], // height
+        readBlock.dimensions[1], // height
+        readBlock.dimensions[2], // depth
         this.format,
         this.type,
         this._typize_newSpecs(
@@ -145,8 +145,8 @@ export class Volume extends EventTarget {
         position[1], // y
         position[2], // z
         readBlock.dimensions[0], // width
-        readBlock.dimensions[1], // depth
-        readBlock.dimensions[2], // height
+        readBlock.dimensions[1], // height
+        readBlock.dimensions[2], // depth
         this.format,
         this.type,
         this._typize_newSpecs(

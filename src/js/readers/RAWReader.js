@@ -1,4 +1,5 @@
 import { AbstractReader } from "./AbstractReader.js";
+import { Block } from "../Block.js";
 
 export class RAWReader extends AbstractReader {
   constructor(loader, options) {
@@ -17,43 +18,46 @@ export class RAWReader extends AbstractReader {
 
   async readMetadata() {
     let metadata = {
-      meta: {
-        version: 1,
+      asset: {
+        version: "1.0",
       },
       modalities: [
         {
           name: "default",
-          dimensions: {
-            width: this.width,
-            height: this.height,
-            depth: this.depth,
-          },
-          transform: {
-            matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-          },
-          format: 6403,
-          internalFormat: 33321,
-          type: 5121,
+          scale: [1, 1, 1],
+          block: 0,
+        },
+      ],
+      blocks: [
+        {
+          dimensions: [this.width, this.height, this.depth],
+          format: 0,
           placements: [],
         },
       ],
-      blocks: [],
+      formats: [
+        {
+          family: "mono",
+          count: 1,
+          type: "u",
+          size: 1,
+          microblockDimensions: [1, 1, 1],
+          microblockSize: 1,
+        },
+      ],
     };
 
     for (let i = 0; i < this.depth; i++) {
-      metadata.modalities[0].placements.push({
-        index: i,
-        position: { x: 0, y: 0, z: i },
+      metadata.blocks[0].placements.push({
+        block: i + 1,
+        position: [0, 0, i],
       });
 
       metadata.blocks.push({
-        url: "default",
-        format: "raw",
-        dimensions: {
-          width: this.width,
-          height: this.height,
-          depth: 1,
-        },
+        data: "default",
+        format: 0,
+        dimensions: [this.width, this.height, 1],
+        encoding: "raw",
       });
     }
 
@@ -62,8 +66,20 @@ export class RAWReader extends AbstractReader {
 
   async readBlock(block) {
     const sliceBytes = this.width * this.height;
-    const start = block * sliceBytes;
-    const end = (block + 1) * sliceBytes;
-    return await this._loader.readData(start, end);
+    const start = (block - 1) * sliceBytes;
+    const end = block * sliceBytes;
+    const data = await this._loader.readData(start, end);
+    return new Block(
+      [this.width, this.height, 1],
+      {
+        family: "mono",
+        count: 1,
+        type: "u",
+        size: 1,
+        microblockDimensions: [1, 1, 1],
+        microblockSize: 1,
+      },
+      data
+    );
   }
 }
