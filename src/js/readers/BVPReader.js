@@ -36,11 +36,13 @@ export class BVPReader extends AbstractReader {
       if (blockMeta.encoding === "s3dc") {
         const MMVblock = this._metadata.blocks[blockIndex - 1];
         const MMVdata = await this._zipReader.readFile(MMVblock.data);
-        data = CommonUtils.decompressS3DC(
+        const decompressedBlock = CommonUtils.decompressS3DC(
           new Uint8Array(data),
           new Uint8Array(MMVdata),
-          blockMeta.dimensions
+          blockMeta.dimensions,
+          this._metadata.formats[blockMeta.format]
         );
+        return decompressedBlock;
       }
       const newBlock = new Block(
         blockMeta.dimensions,

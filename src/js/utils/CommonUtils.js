@@ -1,3 +1,6 @@
+import { Vec } from "../math/Vec.js";
+import { Block } from "../Block.js";
+
 export class CommonUtils {
   static downloadJSON(json, filename) {
     const str =
@@ -161,33 +164,96 @@ export class CommonUtils {
 
   static calculateIbits(srcLength, dimensions) {
     const ratio = (dimensions[0] * dimensions[1] * dimensions[2]) / srcLength;
-    if (ratio == 2) return 4;
-    else if (ratio == 4) return 2;
+    if (ratio == 2) return [4, ratio];
+    else if (ratio == 4) return [2, ratio];
     else throw new Error("Error when calculating iBits");
   }
 
-  static decompressS3DC(src, MMV, dimensions) {
-    const ibits = CommonUtils.calculateIbits(src.length, dimensions);
+  static decompressS3DC(src, MMV, dimensions, format) {
+    // get indexBits and ratio
+    // TODO get indexBits and valueSize from metadata
+    // const [ibits, ratio] = CommonUtils.calculateIbits(src.length, dimensions);
+    // console.log("ibits", ibits);
+    // var bitmask = 3; // 00000011
+    // if (ibits == 4) bitmask = 15; // 00001111
+
+    const ibits = format.indexBits;
     var bitmask = 3; // 00000011
     if (ibits == 4) bitmask = 15; // 00001111
-    // get min and max
-    const min = MMV[0];
-    const max = MMV[1];
-    // make buffer dim^3
-    const dst = new Uint8Array(dimensions[0] * dimensions[1] * dimensions[2]);
-    // loop over src
-    var position = 8 / ibits;
-    for (const val of src) {
-      var offset = 1;
-      for (let i = 0; i < 8; i += ibits) {
-        const index = (val & (bitmask << i)) >>> i; // extract index from bits in byte
-        const dv = min + (max - min) * (index / (Math.pow(2, ibits) - 1)); // calculate decompressed value
-        dst[position - offset] = dv;
-        offset++;
+
+    // prepare data array and uncompressedBlock
+    const finalData = new Uint8Array(Vec.mulElements(dimensions));
+    const finalBlock = new Block(dimensions, format, finalData);
+
+    const numberOfMicroBlocks = MMV.length / 2; // MMV consists of min max pairs for each microblock
+    console.log("numberOfMicroBlocks", numberOfMicroBlocks);
+
+    const tempRatio = Vec.mulElements(dimensions) / numberOfMicroBlocks;
+
+    const MBsideDim = Math.cbrt(tempRatio);
+    console.log("MBsideDim", MBsideDim);
+
+    const uncompressedMicroblockDimensions = [MBsideDim, MBsideDim, MBsideDim];
+    console.log(
+      "uncompressedMicroblockDimensions",
+      uncompressedMicroblockDimensions
+    );
+
+    const microBlockLength = src.length / numberOfMicroBlocks;
+    console.log("microBlockLength", microBlockLength);
+
+    const numberOfMicroBlocksVec = Vec.ceil(
+      Vec.div(dimensions, uncompressedMicroblockDimensions) // [2,2,2] = 8
+    );
+    console.log("numberOfMicroBlocksVec", numberOfMicroBlocksVec);
+
+    var mmvCount = 0;
+    var mb = 0;
+    for (const ijkArray of Vec.lexi(numberOfMicroBlocksVec)) {
+      const compressedMicroBlockData = src.slice(
+        microBlockLength * mb,
+        microBlockLength * (mb + 1)
+      );
+
+      if (compressedMicroBlockData.every((val) => val === 0)) {
+        mmvCount += 2;
+        mb++;
+        continue; // if it's all zeros, read next microblock
       }
-      position += 8 / ibits;
-      offset = 0;
+
+      var uncompressedMicroBlockData = new Uint8Array(64 * 64 * 64); // 262144
+
+      // decompress and write to uncompressedMicroBlockData
+      const min = MMV[mmvCount];
+      const max = MMV[mmvCount + 1];
+      var position = 8 / ibits; // 4
+      for (const val of compressedMicroBlockData) {
+        var offset = 1;
+        for (let i = 0; i < 8; i += ibits) {
+          // 4x
+          const index = (val & (bitmask << i)) >>> i; // extract index from bits in byte
+          const dv = min + (max - min) * (index / (Math.pow(2, ibits) - 1)); // calculate decompressed value
+          uncompressedMicroBlockData[position - offset] = dv; // 4 - 1 = 3 > 2 > 1 > 0
+          offset++;
+        }
+        position += 8 / ibits;
+      }
+
+      // make block from uncompressed data
+      const uncompressedMicroBlock = new Block(
+        uncompressedMicroblockDimensions,
+        format,
+        uncompressedMicroBlockData
+      );
+
+      const pos = Vec.mul(ijkArray, uncompressedMicroblockDimensions);
+
+      finalBlock.set(pos, uncompressedMicroBlock);
+
+      mmvCount += 2;
+      mb++;
     }
-    return dst;
+
+    return finalBlock;
   }
 }
