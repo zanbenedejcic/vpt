@@ -170,13 +170,6 @@ export class CommonUtils {
   }
 
   static decompressS3DC(src, MMV, dimensions, format) {
-    // get indexBits and ratio
-    // TODO get indexBits and valueSize from metadata
-    // const [ibits, ratio] = CommonUtils.calculateIbits(src.length, dimensions);
-    // console.log("ibits", ibits);
-    // var bitmask = 3; // 00000011
-    // if (ibits == 4) bitmask = 15; // 00001111
-
     const ibits = format.indexBits;
     var bitmask = 3; // 00000011
     if (ibits == 4) bitmask = 15; // 00001111
@@ -186,26 +179,18 @@ export class CommonUtils {
     const finalBlock = new Block(dimensions, format, finalData);
 
     const numberOfMicroBlocks = MMV.length / 2; // MMV consists of min max pairs for each microblock
-    console.log("numberOfMicroBlocks", numberOfMicroBlocks);
 
     const tempRatio = Vec.mulElements(dimensions) / numberOfMicroBlocks;
 
     const MBsideDim = Math.cbrt(tempRatio);
-    console.log("MBsideDim", MBsideDim);
 
     const uncompressedMicroblockDimensions = [MBsideDim, MBsideDim, MBsideDim];
-    console.log(
-      "uncompressedMicroblockDimensions",
-      uncompressedMicroblockDimensions
-    );
 
     const microBlockLength = src.length / numberOfMicroBlocks;
-    console.log("microBlockLength", microBlockLength);
 
     const numberOfMicroBlocksVec = Vec.ceil(
       Vec.div(dimensions, uncompressedMicroblockDimensions) // [2,2,2] = 8
     );
-    console.log("numberOfMicroBlocksVec", numberOfMicroBlocksVec);
 
     var mmvCount = 0;
     var mb = 0;
@@ -221,7 +206,9 @@ export class CommonUtils {
         continue; // if it's all zeros, read next microblock
       }
 
-      var uncompressedMicroBlockData = new Uint8Array(64 * 64 * 64); // 262144
+      var uncompressedMicroBlockData = new Uint8Array(
+        MBsideDim * MBsideDim * MBsideDim
+      );
 
       // decompress and write to uncompressedMicroBlockData
       const min = MMV[mmvCount];
